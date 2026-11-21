@@ -1,0 +1,326 @@
+@import "tailwindcss";
+
+:root {
+  --bg-0: #0A0F25;
+  --bg-1: #121A3F;
+  --surface-1: rgba(255, 255, 255, 0.06);
+  --surface-2: rgba(255, 255, 255, 0.10);
+  --surface-solid: rgba(14, 21, 51, 0.90);
+  --border-glass: rgba(255, 255, 255, 0.14);
+  --text: #F5F7FF;
+  --text-dim: #AAB3DE;
+  --primary: #7C5CFF;
+  --primary-2: #00B8FF;
+  --accent: #00E5C3;
+  --gold: #FFC83D;
+  --danger: #FF4D6D;
+  --success: #3DDC84;
+  --team-red: #FF4D5E;
+  --team-blue: #3B82F6;
+  --grad-brand: linear-gradient(135deg, #7C5CFF, #00B8FF);
+  --grad-bg: radial-gradient(1200px 800px at 20% 10%, #2A1F6B 0%, transparent 60%),
+    radial-gradient(1000px 700px at 90% 90%, #0B4F7A 0%, transparent 55%),
+    linear-gradient(160deg, #0A0F25, #121A3F);
+  --radius-m: 20px;
+  --radius-l: 28px;
+  --radius-pill: 999px;
+  --shadow-2: 0 14px 40px rgba(0, 0, 0, 0.45);
+  --glow-accent: 0 0 0 4px rgba(0, 229, 195, 0.55), 0 0 28px rgba(0, 229, 195, 0.45);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --font-display: 'Fredoka', system-ui, sans-serif;
+  --font-body: 'Nunito', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-0);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+.font-mono-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.arcade-bg {
+  background: var(--grad-bg);
+}
+
+/* Solid/translucent panel safe over WebGL without backdrop-filter stalls */
+.hud-panel {
+  background: rgba(12, 18, 44, 0.86);
+  border: 1px solid var(--border-glass);
+  box-shadow: var(--shadow-2);
+}
+
+.glass-panel {
+  background: rgba(16, 23, 56, 0.82);
+  border: 1px solid var(--border-glass);
+  box-shadow: var(--shadow-2);
+}
+
+/* Neon Arcade animations (transform & opacity only) */
+@keyframes screenEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes mapPreviewEnter {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes mapThumbZoom {
+  0% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes cardSelectBounce {
+  0% {
+    transform: scale(0.97);
+  }
+  55% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes playerRowIn {
+  0% {
+    opacity: 0;
+    transform: translateX(28px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes countdownPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes streakBannerIn {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes killFeedIn {
+  0% {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes hudShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(18px, -14px, 0);
+  }
+}
+
+@keyframes pickupPop {
+  0% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  85% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+}
+
+.anim-screen-enter {
+  animation: screenEnter 280ms var(--ease-out) both;
+}
+
+.anim-map-preview {
+  animation: mapPreviewEnter 200ms var(--ease-out) both;
+}
+
+.anim-map-thumb {
+  animation: mapThumbZoom 400ms var(--ease-out) both;
+}
+
+.anim-card-selected {
+  animation: cardSelectBounce 240ms var(--ease-bounce) both;
+}
+
+.anim-player-row {
+  animation: playerRowIn 300ms var(--ease-bounce) both;
+}
+
+.anim-countdown-pop {
+  animation: countdownPop 650ms var(--ease-bounce) both;
+}
+
+.anim-streak-in {
+  animation: streakBannerIn 350ms var(--ease-bounce) both;
+}
+
+.anim-killfeed-in {
+  animation: killFeedIn 200ms var(--ease-out) both;
+}
+
+.anim-hud-shake {
+  animation: hudShake 240ms ease-out;
+}
+
+.anim-pickup-pop {
+  animation: pickupPop 2000ms var(--ease-out) both;
+}
+
+/* Interactive buttons & cards */
+.btn-arcade {
+  transition: transform 120ms var(--ease-out), box-shadow 120ms var(--ease-out), opacity 120ms ease;
+}
+
+.btn-arcade:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.btn-arcade:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.btn-arcade:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: none;
+  box-shadow: var(--glow-accent);
+}
+
+.card-lift {
+  transition: transform 120ms var(--ease-out), box-shadow 120ms var(--ease-out), border-color 120ms ease;
+}
+
+.card-lift:hover:not(:disabled) {
+  transform: translateY(-4px);
+}
+
+/* Accessibility: Reduced Motion */
+.reduced-motion *,
+.reduced-motion *::before,
+.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Large UI Accessibility Scale */
+.large-ui {
+  font-size: 18px;
+}
+
+/* Custom thin scrollbars inside modals/lists */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(170, 179, 222, 0.35);
+  border-radius: 999px;
+}

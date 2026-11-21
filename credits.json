@@ -1,0 +1,14 @@
+{
+  "title": "Tank Duel Online",
+  "version": "1.0.0",
+  "architecture": "Authoritative Node.js WebSocket + Three.js + React",
+  "dependencies": [
+    { "name": "Three.js", "license": "MIT" },
+    { "name": "React", "license": "MIT" },
+    { "name": "Lucide Icons", "license": "ISC" },
+    { "name": "ws", "license": "MIT" },
+    { "name": "Express", "license": "MIT" }
+  ],
+  "audio": "Procedural Web Audio API synthesis",
+  "textures": "Procedural HTML5 Canvas textures"
+}

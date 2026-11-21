@@ -1,0 +1,830 @@
+# TANK DUEL ONLINE: COMPLETE END-TO-END MASTER SPECIFICATION
+### 3D multiplayer tank battle for the office. Paste into a NEW Google AI Studio Build project.
+
+---
+
+## 0. HOW TO USE THIS DOCUMENT
+
+1. Open Google AI Studio, then **Build**, and start a new app.
+2. Paste **Section 1 (Master Prompt)** first. It tells the AI the rules for the whole job.
+3. Then paste the rest **phase by phase** (Section 22). Each phase says which sections to paste. After each phase: test it, then say "continue".
+4. If the prompt box is too small, paste the sections listed for the phase only. Sections 2, 3, 4 and 5 are needed in nearly every phase, so always paste them first.
+5. Multiplayer testing in AI Studio: open the preview in **2 to 4 browser tabs**. Real office test: deploy (Section 23) and use 2 PCs.
+6. If something breaks, use the debug prompts in Section 24.
+
+Table of contents: 1 Master prompt. 2 Project summary. 3 Office play flow. 4 Controls. 5 Tank design and stats. 6 Combat rules. 7 Weapons and missiles. 8 Power Boxes. 9 Game modes. 10 Maps (6 maps with data). 11 3D look and camera. 12 Tank animations and destruction. 13 Effects. 14 Aim pin and targeting help. 15 HUD. 16 Screens and lobby. 17 UI design system. 18 Audio. 19 Bots. 20 Networking. 21 Assets and image prompts. 22 Build phases. 23 Deployment. 24 Debug prompts. 25 QA checklist. 26 Documents to create. 27 Final deliverables. **Addendum (exact details to prevent bugs): 28 Tank classes and Garage, 29 Animation specification sheet, 30 Exact UI element specification, 31 Rules and edge cases, 32 Server tick order and validation, 33 Requirement traceability.**
+
+---
+
+## 1. MASTER PROMPT (paste this first)
+
+You are a senior game developer, network programmer, 3D artist (procedural) and QA engineer. Build **Tank Duel Online**: a polished, original, **3D multiplayer tank battle game** for web browsers. Colleagues in an office each use their own PC (keyboard + mouse), join a room with a 4-letter code, and fight online in real time. It is ONE game (tank battles), so it must be deep, smooth and beautiful.
+
+Strict rules:
+- **3D with Three.js**, low-poly stylized tanks and maps built from code primitives (no external model files required).
+- **Online multiplayer** with an **authoritative Node.js WebSocket server** (Section 20). Rooms, lobby, 2 to 10 human players, bots fill empty slots.
+- Tanks are **small on screen and maps are large** (Sections 5 and 10).
+- 5 game modes, 6 maps, 7 missile weapons, 6 timed power-ups, Power Boxes, full HUD, aim pin and lead indicator, cinematic tank destruction animation, modern UI (Sections 7 to 17).
+- **Sections 28 to 33 (the Addendum at the end) are part of the specification and take priority where they are more exact.** Implement every row of the edge-case table in Section 31 and the tick order in Section 32.
+- Everything original. No copyrighted art, names, music or code from other games.
+- Work phase by phase (Section 22). After each phase: test, fix bugs, report. Never say something works if it was not tested.
+- Zero console errors, zero dead-end screens, near 60 FPS on a normal office PC.
+- Project structure: `/shared` (code used by both server and client), `/server`, `/client`. Put every tunable number in ONE config file (`/shared/config.ts`): sizes, speeds, damage, cooldowns, times. Never hard-code magic numbers elsewhere.
+- Edit only the files that need to change; never rewrite the whole project; never delete working features.
+- Keep `PROGRESS.md` with every feature marked NOT STARTED / BUILT / TESTED / BUGGY. Update it after each phase. If a reply is cut off, continue exactly where you stopped.
+- No AI/Gemini API calls from the game. No login. No personal data.
+
+---
+
+## 2. PROJECT SUMMARY
+
+| Item | Decision |
+|---|---|
+| Name | Tank Duel Online |
+| Players | 2 to 10 humans per room, up to 12 tanks total with bots |
+| Platform | Desktop browser (Chrome, Edge, Firefox), keyboard + mouse, optional gamepad |
+| Graphics | Three.js, low-poly 3D, angled chase camera, shadows, particles |
+| Network | WebSocket, authoritative server, client prediction, interpolation |
+| Server | Node.js 20 + Express + `ws`, TypeScript |
+| Client | Vite + TypeScript + Three.js, HTML/CSS UI layer (or React) |
+| Hosting | AI Studio deploy (Cloud Run) or an office PC on the LAN (Section 23) |
+| Accounts | None. Players type a nickname (max 14 characters) |
+
+---
+
+## 3. OFFICE PLAY FLOW (end to end)
+
+1. A player opens the link and clicks **Create Room**. They get a code like `KQTR` and an **invite link** (`https://.../?room=KQTR`). Anyone opening the link lands on Join with the code filled in.
+2. Friends join. In the **Lobby** each picks a tank color and style, and clicks **Ready**.
+3. The **host** picks mode, map, map size, rules (all with live previews, Section 16) and clicks **Start**.
+4. Loading screen (map generation + tips), pre-match plan screen (mode objective + controls reminder), 3-2-1 countdown, battle.
+5. Match end: results screen with podium, stats and awards. **Rematch** keeps the same settings. Players can leave or join between matches.
+6. If the host leaves, the earliest-joined player becomes host. If a player disconnects, they can rejoin within 60 s with the same tank and score.
+7. **Practice mode:** one player vs bots, runs fully in the browser with no server, to learn the controls and test tank feel.
+
+---
+
+## 4. CONTROLS (keyboard + mouse)
+
+| Action | Input |
+|---|---|
+| Drive forward / reverse | **W / S** (or Up / Down) |
+| Turn the hull left / right | **A / D** (or Left / Right) |
+| Aim the turret | **Mouse** (turret rotates toward the aim pin on the ground) |
+| Fire cannon | **Left mouse button** (hold for continuous fire when reloaded) |
+| Fire stored missile | **Right mouse button** or **Space** |
+| Turbo boost | **Left Shift** (stamina limited) |
+| Handbrake pivot turn | **Left Ctrl** (hold while turning for a tight spin) |
+| Zoom camera | **Mouse wheel** (smooth, limited range) |
+| Enlarge minimap for 3 s | **Tab tap** (hold Tab = scoreboard) |
+| Quick chat wheel | **T** |
+| Menu / settings | **Esc** |
+| Mute / Fullscreen | **M** / **F11** |
+
+Rules:
+- The mouse cursor stays visible. **No pointer lock** (Esc and clicks never trap the mouse). The aim point is the cursor ray hitting the ground plane.
+- Turret turn speed is limited (Section 5) so aiming has weight. Mouse sensitivity and turret speed sliders are in Settings.
+- Prevent default browser behavior for game keys, mouse wheel and the right-click menu while playing.
+- Keys are remappable in Settings (conflict detection; reserved keys: Esc, F11).
+- Optional gamepad: left stick = drive, right stick = aim, RT = cannon, LT = missile, LB = turbo, B = handbrake.
+- Show control hints for the first 10 s of the first match.
+
+---
+
+## 5. TANK DESIGN AND STATS (small tanks, big world)
+
+World units are **meters**. Time in seconds. Tanks are deliberately **small relative to the map** so the battlefield feels large and tactical. All values live in `config.ts`.
+
+| Stat | Value |
+|---|---|
+| Hull size (visual and collision) | 1.6 m wide x 2.6 m long x 0.8 m high; turret 1.0 m diameter, barrel 1.6 m long (this table is the **Standard** class; Scout and Heavy are in Section 28) |
+| Health | 100 HP (host can choose 100 or 150) |
+| Forward speed | 7 m/s (accel 18 m/s², brake 28 m/s²) |
+| Reverse speed | 4 m/s |
+| Hull turn speed | 110 degrees/s standing, 70 degrees/s at full speed (smooth curve) |
+| Turret turn speed | 260 degrees/s |
+| Turbo | speed x1.5 for 3 s, recharges in 6 s (cannot be used at 0 stamina) |
+| Handbrake pivot | hull turn speed x1.8 and speed capped at 40% while held |
+| Cannon damage | 30 |
+| Cannon reload | 1.1 s (reload ring on the crosshair) |
+| Cannon shell | speed 55 m/s, lifetime 2.2 s (range 120 m), radius 0.3 m, ricochets off walls once |
+| Respawn | 3 s after death, at a safe spawn point, 2 s spawn shield (blinking, cannot be hurt or fire) |
+
+**Movement feel (shared code `stepTank`)**
+- Acceleration and braking are smooth curves, not instant. The hull turns slower when moving fast and faster when slow.
+- Ground types: normal grass/sand/concrete, **ice** (low friction: velocity keeps drifting, turning has delayed effect), **mud** (speed x0.6), **speed pad** (x1.4 for 2 s).
+- Tanks slide along walls and obstacles (no sticking), and bump each other with a small push, spark effect and thud sound.
+- Visual feel: hull pitches back slightly on acceleration and forward on braking (max 3 degrees), rolls slightly on sharp turns (max 4 degrees), tracks scroll with speed, dust trail on dry ground, snow spray on ice, mud splash in mud.
+- `stepTank(state, input, dt)` lives in `/shared` and is used identically by the server (truth) and the client (prediction).
+
+---
+
+## 6. COMBAT RULES
+
+- **Server authoritative:** the server decides every hit, damage, pickup, kill and score. Clients only send inputs.
+- Damage is applied to HP. At 0 HP the tank is destroyed (Section 12). Damage numbers float above hit tanks.
+- Friendly fire is OFF in team modes. Own explosive barrels and mines can hurt you.
+- **Kills, deaths, assists** (damage in the last 5 s before an enemy died, not the killer), damage dealt, accuracy, power-ups collected, best streak are tracked.
+- **Streak banners:** 3 = "Triple!", 5 = "Rampage!", 7 = "Unstoppable!", 10 = "Legend!".
+- **Spawn rules:** a spawn point is chosen that is at least 40 m from enemies and not in an enemy's view cone; in team modes near teammates.
+- **Anti-camping:** a very strong "lock-on" is not given; instead spawn shield (2 s) and random spawn selection prevent spawn camping.
+- **Destructible objects:** wooden crate (30 HP, breaks), explosive barrel (red, 20 HP, explosion radius 6 m, 40 damage, chains), cracked wall segments (60 HP) on some maps.
+- **Hazards:** none cause instant death; ice and mud only change movement.
+
+---
+
+## 7. WEAPONS AND MISSILES
+
+**Primary cannon:** always available (Section 5).
+
+**Stored missile slot:** only 1 stored weapon at a time (a new Power Box replaces it). Fire with right mouse / Space. The HUD shows its icon and name. Each has a distinct 3D model, trail, explosion, sound and a **warning to the target** (red edge arrow + beep when a missile is locked on or inbound).
+
+| # | Weapon | Uses | How it works | Damage | Counterplay |
+|---|---|---|---|---|---|
+| 1 | **Homing Missile** | 1 | Launches forward, curves toward the nearest enemy within a 60-degree front cone and 90 m (turn rate 80 degrees/s, speed 32 m/s, lifetime 4 s). Red lock-on ring on the target. | 45, small blast 2 m | Turn sharply, break line of sight behind walls, shoot it (it has 10 HP) |
+| 2 | **Cluster Missile** | 1 | Flies to the aim pin (max 70 m), explodes in the air and drops **5 bomblets** in a 6 m circle. | 18 each (max 54 if all hit) | Move out of the warning circle |
+| 3 | **Guided Missile** | 1 | While it flies (max 4 s) the camera follows the missile and the player steers it with the mouse. The tank is vulnerable and cannot move meanwhile. Detonate with the fire key. | 50, blast 3 m | Hit the owner while vulnerable |
+| 4 | **Bouncing Shell** | 3 shots | Heavy shell that ricochets up to 3 times, leaves a short fire trail. | 35 | Use cover angles |
+| 5 | **EMP Pulse** | 1 | Short-range blast (radius 15 m): enemy tanks are slowed to 50% for 3 s, shields removed, their stored weapon is disabled for 3 s. | 0 | Stay away |
+| 6 | **Mines** | 3 | Drop behind the tank. Armed after 1 s, hidden from enemies after 2 s (visible to owner and team as a blinking light). | 50, radius 3 m | Scout; shoot a mine to detonate it early |
+| 7 | **Airstrike** | 1 | The pin marks a spot. After 1.5 s, 3 explosions land in a line (spacing 5 m). A large red warning circle shows to everyone. | 40 each, radius 4 m | Leave the circle |
+
+Balance rules: no weapon kills a full-health tank alone in one hit (max single-hit damage 50 on 100 HP). The tuning numbers live in config.
+
+---
+
+## 8. POWER BOXES
+
+**Power Boxes** are glowing crates floating on fixed **pads** on the map. A tank collects one by driving over it. Boxes respawn **20 s** after pickup. The server decides who gets it (if two tanks arrive at the same time, the earliest server time wins).
+
+**Look:** neon-outlined cube with a "?" symbol, rotating and bobbing, a beam of light going up (visible from far), a pulsing ring on the ground. Pickup: sparkle burst + chime + the power-up name and icon pop up on the HUD for 2 s. Pads show on the minimap as cube icons; a small timer shows when a box is respawning.
+
+**Rules:** 8 to 14 pads per map (more on bigger maps). The box type is random by weight when it respawns. If the tank already holds a stored weapon, a stored-weapon box still replaces it (a small "swap" icon shows).
+
+| Type | Item | Effect | Weight |
+|---|---|---|---|
+| Timed | **Repair Kit** (instant) | +40 HP | 18 |
+| Timed | **Shield** (6 s) | Blue bubble absorbs 50 damage | 10 |
+| Timed | **Rapid Fire** (8 s) | Reload x0.4 | 10 |
+| Timed | **Triple Shot** (8 s) | Cannon fires 3 shells in a 14-degree fan | 8 |
+| Timed | **Speed Boost** (6 s) | Speed x1.4 and instant turbo refill | 8 |
+| Timed | **Damage Up** (8 s) | Cannon damage x1.6 | 6 |
+| Stored | Homing Missile | see Section 7 | 8 |
+| Stored | Cluster Missile | | 7 |
+| Stored | Guided Missile | | 4 |
+| Stored | Bouncing Shell | | 7 |
+| Stored | EMP Pulse | | 5 |
+| Stored | Mines | | 5 |
+| Stored | Airstrike | | 4 |
+
+Timed effects: same type refreshes the timer; different types can run together. They show as small icons with shrinking rings above the health bar, and as colored auras on the tank.
+
+---
+
+## 9. GAME MODES (each plays differently)
+
+The host picks the mode first. The map list then shows recommended maps for that mode first (others are still selectable). A **mode card** shows a 2-line "how to win" plan and a tip.
+
+1. **Free For All (FFA)** - Plan: grab Power Boxes, avoid getting surrounded, hunt weak tanks. First to **15 kills** or highest kills after **8:00**. Respawn on. Recommended maps: Desert Outpost, Industrial Yard, Frozen Lake, Forest Maze.
+2. **Team Deathmatch (TDM)** - Red vs Blue (auto-balanced; host can move players). Friendly fire off. First team to **30 kills** or higher after **10:00**. Respawn near teammates. Recommended: Industrial Yard, Desert Outpost, Twin Bases.
+3. **Last Tank Standing (LTS)** - No respawn. Best of 5 rounds (first to 3). A **safe zone ring** shrinks slowly after 30 s to force fights; outside the ring a tank takes 5 damage per second. Dead players spectate. Recommended: Frozen Lake, Forest Maze, Crater Hill.
+4. **Capture the Flag (CTF)** - Each team has a flag at its base. Carry the enemy flag to your own base while your flag is home to score. The carrier is slowed by 15%, cannot use turbo, and is marked on the minimap for everyone. A dropped flag returns after 15 s or when touched by its team. First to **3 captures** or most after **12:00**. Recommended map: **Twin Bases**.
+5. **King of the Hill (KOTH)** - A glowing zone (radius 10 m) appears at one of 5 spots and moves every **45 s**. Standing alone in the zone (or only your team) gives **1 point per second**. Contested = no points. First to **120 points** or highest after **10:00**. Recommended map: **Crater Hill**.
+
+**Common host options:** map, map size (Small, Medium, Large), time limit, score limit, Power Boxes on/off, bots (0 to 8) and difficulty, friendly fire (teams), tank rule (Classic = everyone Standard / Classes = players pick, Section 28), tank HP (100/150, Classic only), shrinking zone toggle (FFA/TDM), private password.
+**Tie rule:** sudden death (next kill/score wins, max 60 s, then draw).
+**Objective banner** at start: e.g. "Capture the enemy flag!", plus a live objective marker on the HUD.
+
+---
+
+## 10. MAPS (6 maps, with data)
+
+**Coordinates:** meters, origin (0,0) at the map center, x = right, z = down on the minimap. All sizes below are for **Medium**. **Small = x0.75, Large = x1.4** (scale positions and sizes; keep tank size the same; add more props on Large). Perimeter walls are 4 m high, 2 m thick. Store each map as data in `/shared/maps/*.ts` with arrays: `walls, rocks, crates, barrels, trees, zones, spawns, pads, decorations`. Server and client load the same data. Each map needs 12 spawn points, a minimap texture (generated in code from the data) and a lobby thumbnail (generated in code, Section 16).
+
+Object sizes: rock = circle (radius in m, height 2 to 4); wall = box (length x thickness, height 3); crate = 1.6 m box; barrel = 0.9 m cylinder; container = 12 x 2.6 m box, height 2.8; tree = circle radius 0.8 with a visual canopy that does not block shots.
+
+### 10.1 DESERT OUTPOST (balanced, default) - Medium 160 x 160
+- **Look:** warm sand, sunset sun low at 25 degrees (long shadows), orange-pink gradient sky with distant mesas, low cacti and dune bumps as decoration (no collision).
+- **Center rock cluster:** rocks at (0,0) r6, (10,6) r4, (-9,5) r4, (4,-10) r5, (-7,-9) r3.5.
+- **Four L-shaped walls** (each two 20 x 2 segments forming an L facing the center) at (35,35), (-35,35), (35,-35), (-35,-35).
+- **Crate groups (3 crates each):** (55,0), (-55,0), (0,55), (0,-55), (22,-48), (-22,48).
+- **Barrels (red):** (25,10), (25,-10), (-25,10), (-25,-10), (60,30), (-60,-30), (30,60), (-30,-60).
+- **Terrain:** all normal. One **speed pad** strip at (0,28) to (0,40) and (0,-28) to (0,-40).
+- **Spawns (12):** ring radius 68 at 30-degree steps starting at angle 15 degrees, facing the center.
+- **Power pads (10), exact:** (18,0), (-18,0), (0,18), (0,-18), (45,25), (-45,-25), (25,-45), (-25,45), (62,62), (-62,-62).
+- **Strategy:** open fights, flanking around the center; the center is high risk, high reward.
+
+### 10.2 INDUSTRIAL YARD (lanes and ambush) - Medium 160 x 160
+- **Look:** gray concrete floor with yellow-black hazard stripes, cool overcast light with soft shadows, distant crane silhouettes, light haze.
+- **Containers (12 x 2.6 m), 16 in total, exact:** 8 horizontal (long side along x) at (-50,-48), (-25,-48), (25,-48), (50,-48), (-50,48), (-25,48), (25,48), (50,48); 8 vertical (long side along z) at (-38,-16), (-38,16), (38,-16), (38,16), (-62,-16), (-62,16), (62,-16), (62,16). This leaves open lanes at z = 0, z = ±32 and x = 0.
+- **Central loading area:** four low walls 10 x 2 centered at (0,10), (0,-10) (horizontal) and (10,0), (-10,0) (vertical), leaving four diagonal entrances about 7 m wide.
+- **Barrels:** 14 barrels in clusters of 3 to 4 at (±38,±8), (±8,±38), (0,±62).
+- **Crates:** stacks of 4 (2x2) at (±70,0), (0,±70).
+- **Spawns (12):** along the four edges, 3 per edge, 12 m from the perimeter wall, facing in.
+- **Power pads (12), exact:** (20,32), (-20,32), (20,-32), (-20,-32), (50,32), (-50,32), (50,-32), (-50,-32), (55,0), (-55,0), (0,35), (0,-35).
+- **Strategy:** ambushes and corner fights; barrels reward smart shots.
+
+### 10.3 FROZEN LAKE (ice) - Medium 160 x 160
+- **Look:** pale blue ice in the middle, snowy rocky shore, soft blue-white light, falling snow particles, aurora-like gradient sky, tank tread marks stay on the snow for 10 s.
+- **Ice area:** circle radius 45 at (0,0) (**low friction**: friction coefficient 0.15, the tank keeps drifting and turning takes effect with delay; turret and cannon unaffected).
+- **Shore:** normal snow ground. A ring of rocks and ice blocks around radius 50 to 58: 14 rocks r3 to r5 with 6 gaps for entry.
+- **Inside the ice:** 6 ice blocks (cover boxes 4 x 4) at (±12,±12), (±25,0), (0,±25) - they block bullets and tanks.
+- **Barrels:** 6 on the shore at radius 60.
+- **Spawns (12):** on the shore at radius 68, spaced every 30 degrees.
+- **Power pads (10):** 4 on the ice (±14,0), (0,±14); 6 on the shore.
+- **Strategy:** sliding duels on ice, shore cover for slow precise fights.
+
+### 10.4 FOREST MAZE (cover and mud) - Medium 160 x 160
+- **Look:** green ground, tall low-poly pines with canopies that do not block shots, soft morning sun, light fog (limits far view to about 90 m), falling leaf particles.
+- **Hedge walls (maze):** 18 hedge walls, each 24 x 2, forming a loose maze of lanes about 14 m wide, symmetric about both axes, leaving **4 clearings** (circles radius 14) at (±40,±40). Suggested layout: 8 walls along the axes (horizontal at (±30,±16) and vertical at (±16,±30)) and 10 walls placed to form lanes between the clearings. The AI must check that every spawn can reach every power pad and that no tank can get trapped (run a path check when loading the map data).
+- **Trees:** 40 trees (r0.8) along maze edges and in clearings.
+- **Mud patches:** 6 circles r9 (speed x0.6, tire splash) at (±30,0), (0,±30), (±55,±55).
+- **Barrels:** 8 near clearings. **Crates:** 10 groups in lanes.
+- **Spawns (12):** one in each lane end and clearing, at least 35 m apart.
+- **Power pads (12):** 4 in clearings (high risk), 8 along lanes.
+- **Strategy:** close ambushes, mud punishes the slow, clearings are danger zones.
+
+### 10.5 TWIN BASES (Capture the Flag) - Medium 200 x 120
+- **Look:** two colored halves (Red base on the left x < 0 with red tint and banners, Blue base on the right with blue tint), neutral gray center strip, clear day light.
+- **Bases:** Red base at x = -80, Blue base at x = +80. Each base has: a flag stand at (±85, 0), a capture zone circle r5 at (±80,0), a low U-shaped wall (3 segments of 12 x 2) behind the flag, 4 spawn points, a Repair pad.
+- **Center ridge wall:** a long wall along x = 0 with **3 gaps** (14 m wide) at z = -35, 0, 35. Each gap has a pair of rocks r3 to create cover.
+- **Mid-field cover:** rocks and crates mirrored: (±35,±20) crate groups, (±40,0) rock r5, (±25,±45) walls 14 x 2, 6 barrels at (±55,±30), (±55,0).
+- **Speed pads:** along the top and bottom edges (z = ±50) from x = -40 to -20 and 20 to 40 (fast flank routes).
+- **Spawns (12):** 6 per team near bases, facing the center. **Power pads (12):** 6 per side, plus 2 in the center gaps.
+- **Strategy:** attack through 3 routes (gap lanes) or fast flanks; defend the flag with the U-wall.
+
+### 10.6 CRATER HILL (King of the Hill) - Medium 160 x 160
+- **Look:** gray-brown volcanic ground, a raised circular **crater rim** around the center (ring wall radius 30, thickness 3, with **4 gaps** each 12 m wide at N, E, S, W), inside the crater a glowing orange floor, red-orange sky glow, drifting embers.
+- **Hill zones (5):** center (0,0), and at (0,-48), (48,0), (0,48), (-48,0) (each r10). The active zone is a glowing cylinder ring; the next zone is shown as a faint ring 5 s early.
+- **Outer cover:** rocks r3 to r5 scattered at radius 45 to 70 (16 rocks), 8 crate groups, 10 barrels.
+- **Spawns (12):** radius 70 ring facing the center.
+- **Power pads (12):** 4 inside the crater, 8 outside.
+- **Strategy:** the active zone keeps moving, so teams must reposition; the crater is a fort with 4 entrances.
+
+**Map size option:** Small (x0.75) for 2 to 4 players, Medium (default) for 4 to 8, Large (x1.4) for 8 to 12. Show "Recommended players" on the map preview card.
+
+---
+
+## 11. 3D LOOK AND CAMERA
+
+**Renderer:** WebGL, antialiasing on, ACES tone mapping, sRGB output, pixel ratio capped at 1.5 (2 on High). One directional sun with soft shadows (shadow map 2048 High, 1024 Medium, off Low), hemisphere ambient light, map-colored fog. Sky is a gradient dome with low-poly clouds or distant landmarks per map.
+**Materials:** `MeshStandardMaterial`, flat colors, slight roughness, thin darker edge or emissive trims for a stylized toy-like look. Ground has a subtle procedural noise texture.
+**Performance:** instancing for repeated props (crates, barrels, trees, containers), merged static geometry per map, pooled bullets and particles, frustum culling, max 4 dynamic lights (muzzle flashes). Quality presets Low / Medium / High; **auto-lower quality** if FPS stays below 40 for 5 s.
+
+**Camera (third-person angled chase):** height about 26 m, distance about 22 m behind, pitch about 55 degrees, FOV 60 (adjustable 50 to 80), follows the tank with smooth lerp (0.1) and leads slightly toward the aim direction. **Mouse wheel zoom** between 18 m and 45 m with easing. Small camera shake on firing, hits and explosions (toggle in Settings). Because tanks are small, name tags and health bars have a **fixed screen size**.
+
+**Spectator mode** after death in Last Tank Standing: follow living players (left/right click to switch), free camera option.
+
+---
+
+## 12. TANK MODEL, ANIMATION AND DESTRUCTION
+
+**Model (all from primitives, about 1200 to 1800 triangles):**
+- Hull: wedge-shaped body with a beveled front, side skirts, small headlights (emissive).
+- Two tracks: rounded boxes with repeated cleats that scroll with speed (UV offset or moving instances).
+- Turret: dome with a hatch, rotates independently; barrel with a muzzle brake and a recoil piston; small antenna that sways.
+- Colors: player/team color on hull and turret top; dark gray tracks; player number badge on the sides; 12 color choices; 3 turret styles and 6 decals to customize in the lobby.
+- Tag above: nickname + health bar (fixed screen size), enemy tags tinted red in team modes.
+
+**Animations:**
+- Idle: slight engine vibration (0.02 m jitter), antenna sway.
+- Move: tracks scroll, hull pitch and roll per Section 5, dust or snow or mud particles by ground.
+- Fire: barrel recoil 0.2 m in 0.1 s, return in 0.25 s; muzzle flash (light + sprite, 60 ms); small hull kick back; smoke puff.
+- Hit: the tank flashes white for 80 ms, a small spark burst at the hit point, floating damage number, short shake.
+- Low health: below 30 HP the tank smokes (gray, then black below 15 HP) and small flames flicker.
+- Shield on: a translucent blue fresnel bubble with hexagon pattern pulsing; on hit it ripples.
+- Spawn: the tank materializes from a light beam over 0.6 s with a ring, then blinks during the 2 s protection.
+- Win pose (results screen): turret spins and the barrel fires a celebration shot.
+
+**TANK DESTRUCTION SEQUENCE (cinematic, about 2.5 s, plays for everyone):**
+| Time | Event |
+|---|---|
+| 0.00 s | Hit flash white; time scale for the destroyed player's own view drops to 0.3 for 0.3 s (slow motion), a short low "thump". |
+| 0.05 s | Bright orange **fireball** at the hull (expanding sprite + light flash, radius 3 m), a **shockwave ring** on the ground (expands to 6 m in 0.4 s), dust blast. |
+| 0.10 s | The **turret blows off**: launched upward (6 m high) spinning, follows a parabolic arc and lands up to 8 m away after 1.2 s with a thud and a dust puff; the barrel may detach. |
+| 0.10 s | Hull splits into **12 to 16 debris chunks** (hull plates, track pieces, wheels) with physics-lite arcs, bouncing once, each leaving a small smoke trail; the lights flicker off. |
+| 0.30 s | **Fire and black smoke column** starts from the wreck (rises 12 m, lasts 6 s); burning embers float up. |
+| 0.40 s | Camera shake for nearby players (stronger the closer, max 0.3 m), a scorched **blast decal** (ground mark, stays 20 s then fades). |
+| 0.40 to 1.5 s | Secondary small explosions (2 to 3 pops) from the wreck; chain damage to nearby barrels or tanks if the tank carried a stored mine or missile (small blast 2 m, 15 damage). |
+| 1.5 to 3.0 s | The wreck (blackened, tilted hull) stays and burns, then fades out. A "kill ping" icon shows on the minimap. |
+| Always | Kill feed entry, the killer gets a kill sound, the victim sees a "Destroyed by X" panel + respawn countdown + optional 2-second kill-cam replay from the killer's view. |
+
+All debris and particles come from **object pools**; reduced-motion and Low quality use fewer pieces (6) and no slow motion.
+**Explosive barrel explosion** reuses a smaller version of this effect (fireball, ring, flying barrel pieces). **Crate break:** wooden planks fly out in a burst.
+
+---
+
+## 13. EFFECTS LIST (all pooled)
+
+Muzzle flash, shell tracer with short trail, impact sparks and dust (different color per surface), ricochet spark with a "ping", explosions (3 sizes), shockwave ring, debris, smoke puffs, fire, embers, track dust / snow / mud, tire-mark decals (fade in 10 s), shield bubble, power-up auras, Power Box beam and ring, homing missile smoke trail with flame, cluster bomblet falling trails, guided missile camera shake, EMP pulse expanding ring with electric arcs, mine blink light, airstrike warning circle (pulsing red, countdown), speed pad arrows, hill-zone glow, flag glow and cloth wave, safe-zone ring wall (translucent), confetti on results. Optional bloom on High only. Never flash the full screen more than 3 times per second.
+
+---
+
+## 14. AIM PIN AND TARGETING HELP (makes hitting opponents easy)
+
+- **Aim pin:** a clear 3D marker on the ground where the mouse points: a white ring with a center dot and a short vertical line (pin). It scales with distance so it stays readable, and a thin aim line goes from the barrel to the pin. The pin turns **red and pulses** when an enemy is under or near it. Pin style, size and color are in Settings.
+- **Reload ring:** a circular progress around the pin; it brightens when the cannon is ready.
+- **Lead indicator:** for each visible enemy within 100 m, a small dot shows where to aim to hit a moving tank (predicted from target velocity and shell speed). Toggle in Settings (default ON).
+- **Light aim assist:** when the pin is within 3 degrees of an enemy, the turret target is nudged toward it (never auto-fires). Toggle (default ON, "Light"; options Off / Light).
+- **Enemy markers:** red outline, name tag and health bar over visible enemies; a faint see-through outline behind walls (shows only for 1 s after last seen); **off-screen arrows** at the screen edge with distance numbers; an "enemy spotted" ping on first sight.
+- **Hit feedback:** hit marker on the pin, different sound for a kill, floating damage numbers, damage direction arrows when you are hit.
+
+---
+
+## 15. HUD
+
+```
++--------------------------------------------------------------------+
+| [Kill feed]                    TIME 06:42  OBJECTIVE      [Minimap]|
+| top-left                       top-center                 top-right|
+|                                                                    |
+|                      3D BATTLE VIEW (aim pin follows mouse)        |
+|                                                                    |
+| [Damage arrows at screen edge]                                     |
+|                                                                    |
+| [Kills/Deaths]  [Weapon slot] [HEALTH bar + turbo bar] [Buffs]     |
+| bottom-left     bottom-center  bottom-center           bottom-right|
+|                                          [Ping | FPS] small       |
++--------------------------------------------------------------------+
+```
+- **Health bar:** large, bottom center, smooth drain with a white "lag" bar, numeric HP. **Turbo bar** under it.
+- **Weapon slot:** icon + name + key hint of the stored weapon; **buffs** as icons with shrinking rings.
+- **Kill feed:** last 5 events, fade after 6 s, your kills highlighted.
+- **Scoreboard (hold Tab):** name, kills, deaths, assists, damage, ping; team totals on top in team modes.
+- **Minimap:** top-down map with walls, pads, tanks (dots, your own bigger with a view cone), flags, hill zones, the safe-zone ring and recently seen enemies. **Tab tap** enlarges it for 3 s.
+- **Center messages:** "FIGHT!", streak banners, "Last 30 seconds!", "Zone shrinking!", "Flag taken!", "Respawning in 3...".
+- **Warnings:** inbound missile warning (red arrow + beep), low health vignette, connection warning when ping > 200 ms.
+
+---
+
+## 16. SCREENS AND LOBBY
+
+Flow: **Title → Main Menu → (Create Room | Join Room | Practice) → Lobby → Loading → Plan screen → Countdown → Battle → Results → Lobby**.
+
+1. **Title:** an animated 3D tank turntable behind the logo "TANK DUEL ONLINE", "Press any key".
+2. **Main Menu:** Create Room, Join Room, Practice vs Bots, How to Play, Settings, Credits. Nickname field (saved). A rotating 3D tank preview.
+3. **Join Room:** a 4-letter code input (auto-uppercase), optional password; clear errors ("Room not found", "Room is full", "Match in progress: join as spectator").
+4. **LOBBY (important):**
+   - Large room code and a **Copy invite link** button; player list (up to 10) with color, nickname, host crown, ready check, ping; host can kick.
+   - **Your tank preview** (3D, rotating) with a 12-color picker, 3 turret styles, 6 decals.
+   - **Host controls:** Mode (cards with plan text), **Map dropdown with live preview**, **Map size** (Small / Medium / Large), time limit, score limit, Power Boxes on/off, bots count and difficulty, friendly fire, tank HP, shrinking zone, password.
+   - **MAP PREVIEW CARD (required):** when the host changes the map in the dropdown (mouse or keyboard arrows), instantly show a card (fade and slide, 200 ms) with: a **thumbnail 640x360** generated in code from the map data (top-down render of walls, cover, ice/mud areas, pads, spawns, bases or zones), the map name, a 1-line description, recommended players, "best for" tag (Close fights / Open fights / Team play / Flag battle / Hill control), hazard icons (ice, mud, barrels, speed pads), and the size selected. Non-host players see the same card **read-only**, so everyone sees the chosen arena. If thumbnail rendering fails, show a colored gradient with the map icon.
+   - **Mode card:** objective in 2 lines and a tip. The map dropdown lists maps recommended for the chosen mode first.
+   - Chat box with quick messages; **Ready** for everyone; **Start** for the host (needs 2 players ready, or 1 player plus bots).
+5. **Loading:** progress bar, tip text ("Shoot barrels to hurt groups of tanks", "Mud slows you; ice makes you slide").
+6. **Plan screen (5 s):** map name, mode objective, controls reminder.
+7. **Countdown:** 3, 2, 1, FIGHT.
+8. **In-game menu (Esc):** Resume, Settings, Controls, Leave Match. The game does not pause for others.
+9. **Death overlay:** "Destroyed by X", respawn countdown, optional kill-cam.
+10. **Results:** winner banner + confetti, 3D podium for the top 3 (tanks on blocks, win pose), full stats table, **awards** (Sharpshooter, Tank Buster, Survivor, Collector, Flag Hero, Hill King), buttons **Rematch**, **Back to Lobby**, **Leave**.
+11. **Settings:** Graphics (quality, resolution scale, shadows, FOV, show FPS/ping), Audio (master, music, effects, mute), Controls (remap, sensitivity, turret speed), Aiming (pin style, lead indicator, aim assist), Gameplay (camera shake, crosshair), Accessibility (large UI, colorblind-safe team colors, reduced motion).
+12. **How to Play:** illustrated page with controls, modes, power-ups and missiles legend.
+13. **Reconnecting modal:** "Connection lost. Reconnecting... (45 s)", retry and back to menu.
+14. **Credits:** every third-party asset (name, author, link, license).
+
+---
+
+## 17. UI DESIGN SYSTEM ("Neon Arcade Glass")
+
+Deep navy gradient background, frosted-glass panels, glowing mint and violet accents, big rounded buttons, bold friendly fonts, bouncy animation. Must look like a modern console game.
+
+```css
+:root{
+ --bg-0:#0A0F25; --bg-1:#121A3F;
+ --surface-1:rgba(255,255,255,.06); --surface-2:rgba(255,255,255,.10);
+ --border-glass:rgba(255,255,255,.14);
+ --text:#F5F7FF; --text-dim:#AAB3DE;
+ --primary:#7C5CFF; --primary-2:#00B8FF; --accent:#00E5C3;
+ --gold:#FFC83D; --danger:#FF4D6D; --success:#3DDC84;
+ --team-red:#FF4D5E; --team-blue:#3B82F6;
+ --grad-brand:linear-gradient(135deg,#7C5CFF,#00B8FF);
+ --grad-bg:radial-gradient(1200px 800px at 20% 10%,#2A1F6B 0%,transparent 60%),
+           radial-gradient(1000px 700px at 90% 90%,#0B4F7A 0%,transparent 55%),
+           linear-gradient(160deg,#0A0F25,#121A3F);
+ --radius-m:20px; --radius-l:28px; --radius-pill:999px;
+ --shadow-2:0 14px 40px rgba(0,0,0,.45);
+ --glow-accent:0 0 0 4px rgba(0,229,195,.55),0 0 28px rgba(0,229,195,.45);
+ --ease-out:cubic-bezier(.2,.8,.2,1); --ease-bounce:cubic-bezier(.34,1.56,.64,1);
+ --font-display:'Fredoka',system-ui,sans-serif; --font-body:'Nunito',system-ui,sans-serif;
+}
+```
+- **Fonts:** Fredoka (titles, buttons, numbers), Nunito (text), from Google Fonts with system fallback. Minimum text 16 px; HUD numbers 24 px or larger.
+- **Components (build once, reuse):** buttons (primary gradient, secondary glass, ghost, danger; hover lift + glow, focus ring, pressed squash, disabled 40%), glass panels (`backdrop-filter: blur(18px)`, fall back to a solid color), cards (mode, map, player), player chips, toggles, sliders, segmented controls, tabs, dropdowns with a preview, modals, toasts, tooltips, progress rings.
+- **Motion:** screen transitions fade + slide 24 px in 280 ms; button hover 120 ms; cards enter staggered (40 ms apart); score numbers count up; countdown numbers pop; confetti burst (150 pooled particles) on win. Use only `transform` and `opacity`. Respect reduced motion. No flashing above 3 per second.
+- **Icons:** one open-source SVG icon set (for example Lucide, MIT), credited; no emoji icons. Each weapon and power-up has its own SVG icon (wrench, shield, flame, triple arrows, lightning, star, missile, cluster, joystick/guided, bounce, pulse, mine, airstrike).
+- **Logo:** wordmark "TANK DUEL ONLINE" in Fredoka 700 with gradient fill, dark outline, glow, and a small tank silhouette. App icon: rounded gradient square with a tank.
+- **Backgrounds:** menus use the gradient with slowly drifting translucent shapes and a subtle grid or noise overlay.
+- **Accessibility:** color never the only signal (teams also have icons and "RED/BLUE" labels), contrast 4.5:1, visible focus, large-UI option.
+
+---
+
+## 18. AUDIO
+
+Generated with the **Web Audio API** (no files needed) or free CC0 sounds (Kenney, Freesound). Each file under 100 KB.
+| Event | Sound |
+|---|---|
+| Cannon fire | punchy low boom + short crack (pitch randomized) |
+| Impact / ricochet | stone thud / metallic ping |
+| Tank destruction | big layered boom, debris rumble, secondary pops |
+| Engine | low looping hum, pitch rises with speed, positional for other tanks |
+| Tread, turret servo | quiet loops while turning |
+| Power Box pickup | bright rising chime |
+| Shield, rapid fire, EMP | electric zaps / pulse |
+| Missiles | launch whoosh, rising whine, warning beep for the target |
+| Mine, airstrike | beep, falling whistle then blasts |
+| Hit marker / kill confirm | tick / double tick |
+| Flag taken / captured, zone captured | horn, fanfare, low drum |
+| UI hover/click/ready/countdown/win/lose | soft tick, pop, chime, beeps, fanfare, gentle fall |
+Positional 3D audio for other tanks and explosions (distance falloff). Menu music is calm, battle music energetic, at 25% volume. Settings: master / music / effects / mute (M). Audio starts only after the first click or key press.
+
+---
+
+## 19. BOTS
+
+Server-side bots (0 to 8) send the same inputs as humans and get no extra information. Difficulty: Easy (0.6 s reaction, 12 degrees aim error), Medium (0.35 s, 6 degrees), Hard (0.15 s, 2 degrees, target prediction). Behavior: patrol between points, take cover, approach the nearest visible enemy to 20 to 40 m, strafe, grab nearby Power Boxes, retreat for a Repair Kit under 30 HP, shoot barrels near enemies, avoid walls with whisker raycasts, use missiles sensibly, play the mode objective (carry or defend flags, go to hill zones, stay inside the safe zone). Practice mode runs the same bot code locally in the browser.
+
+---
+
+## 20. NETWORKING ARCHITECTURE (critical)
+
+**Plan A (default): authoritative Node.js WebSocket server.** One Node process serves the built client files AND the WebSocket on the **same port** (`process.env.PORT`, WebSocket path `/ws`, health check `/healthz`, listen on `0.0.0.0`). Required for Cloud Run and most hosts.
+
+- Server simulation **30 Hz** fixed. Clients send inputs every tick with a sequence number: `{seq, forward, turn, aimX, aimZ, fire, useWeapon, turbo, handbrake}`. Server sends **snapshots at 20 Hz** (tanks, bullets, missiles, boxes, flags, zone, objects) and reliable **events** (kill, pickup, explosion, streak, chat) immediately.
+- **Client prediction + reconciliation** for the local tank using the shared `stepTank`; unacknowledged inputs are replayed after each snapshot; small errors smoothed over 100 ms, snap if over 2 m.
+- **Interpolation** for others: render 100 ms in the past; extrapolate at most 200 ms on packet loss.
+- Shells and missiles are simulated deterministically from spawn data on clients; **hits and damage come only from the server**. Muzzle flash and sound play instantly on the shooter's client.
+- **Server validation:** clamp all inputs, enforce reload times, turret speed and max speed; ignore impossible input; never trust client positions. **Lag compensation:** rewind targets by the shooter's one-way latency (max 150 ms) for hit checks.
+- **Rooms:** 4 letters (no I, O, L, 0, 1), optional password, max 10 humans + bots up to 12 tanks, states `LOBBY → COUNTDOWN → PLAYING → RESULTS → LOBBY`, deleted 60 s after the last player leaves. **Reconnect** with a `playerToken` in sessionStorage (60 s; tank parked and invulnerable meanwhile). **Host migration** to the earliest-joined player. Ping/pong every 2 s; kick silent connections after 10 s.
+- **Messages (JSON, types in `/shared/protocol.ts`):**
+  Client → server: `createRoom, joinRoom, leaveRoom, setReady, setTank, hostSettings, startMatch, input, chat, rematch, ping`.
+  Server → client: `roomJoined, roomUpdate, countdown, matchStart {mapId, size, seed}, snapshot, event, matchEnd, error, pong`.
+- Round positions to 2 decimals and angles to 1 decimal. Bandwidth under 30 KB/s per client with 12 tanks.
+- **Security:** sanitize nicknames (trim, remove HTML, basic word filter), rate limit 120 messages/s per socket, ignore unknown types, no personal data stored.
+- **Debug tool:** URL option `?lag=150&loss=3` simulates latency and packet loss for testing.
+
+**Plan B (only if a WebSocket server cannot run in AI Studio):** host-authoritative peer-to-peer using PeerJS (WebRTC). The host's browser runs the same shared simulation; others connect to the host. Same protocol and shared code. Tell the user this is less reliable behind strict office firewalls.
+
+---
+
+## 21. ASSETS AND IMAGE PROMPTS
+
+**Default (zero risk):** everything is generated in code (tanks, maps, props, particles, sky, SVG icons, sounds). The game must run with no external files. **Optional upgrade:** free low-poly `.glb` models (Kenney, Quaternius, Poly Pizza, CC0 preferred) and CC0 sounds, with the code-made version kept as fallback. Models under 300 KB each. List every third-party asset in `credits.json`.
+
+**Images to generate (AI image generator), saved in `/client/public/assets/images/`:**
+1. *Title banner 1920x1080:* "Stylized low-poly 3D tanks battling in a large desert arena at sunset, glowing power-up crates with light beams, dramatic explosions, vibrant colors, clean modern game key art, no text, no logos, original design".
+2. *Map thumbnails 640x360 (one each):* "Top-down angled view of a low-poly [desert outpost with rocks and crates / industrial yard with shipping containers / frozen lake with ice and snowy shore / forest maze with hedges and pines / two-base capture-the-flag arena with red and blue bases / volcanic crater hill arena] tank battle map, bright stylized game art, no text". (The game also draws code thumbnails as a fallback.)
+3. *Weapon and power-up icons 256x256 transparent:* one glowing icon per item (13 total, Section 8).
+Do not copy any existing game's art or characters.
+
+---
+
+## 22. BUILD PHASES (give to AI Studio one at a time)
+
+**Phase 1: Project, config, offline 3D prototype.** Paste Sections 1 to 5, 11, 12 and 28 to 32 with this phase. Create `/shared`, `/server`, `/client`, `config.ts`, `PROGRESS.md`. Three.js scene, Desert Outpost (Medium), small tank model (Section 5 and 12), movement, mouse aim pin, cannon, shells, ricochet, crates and barrels, camera with zoom, basic HUD. *Test:* 60 FPS, good feel, correct hits on small tanks, no tunneling.
+**Phase 2: Shared simulation.** Move movement, collision, bullets and map data into `/shared` (no browser/Node dependencies) with unit tests. *Test:* same inputs give same results on both sides.
+**Phase 3: UI shell.** Design system and all screens (Section 16, 17) with mock data, including the lobby map preview card and mode cards. *Test:* no dead ends, keyboard + mouse navigation.
+**Phase 4: Server, rooms, lobby.** Express + `ws`, rooms, codes, join/leave, ready, host settings (live previews for all), kick, host migration, reconnect, rate limit. *Test:* 2 to 8 tabs create and join.
+**Phase 5: Netcode.** 30 Hz server simulation, inputs, 20 Hz snapshots, prediction, reconciliation, interpolation, lag compensation, `?lag` debug. *Test:* smooth at 150 ms.
+**Phase 6: Combat and modes.** Damage, destruction sequence (Section 12), respawn, scoring, FFA, TDM, Last Tank Standing with safe zone, kill feed, scoreboard, match end, results, rematch.
+**Phase 7: Weapons and Power Boxes.** All 13 box items, HUD slot and buffs, warnings, effects.
+**Phase 8: Maps.** Industrial Yard, Frozen Lake (ice), Forest Maze (mud), Twin Bases, Crater Hill, minimaps, thumbnails, map sizes.
+**Phase 9: CTF and KOTH modes.**
+**Phase 10: Bots and Practice mode.**
+**Phase 11: Polish.** Effects, audio, animations, camera, quick chat, settings, accessibility, loading tips, aim assist and lead indicator tuning.
+**Phase 12: Full QA** (Section 25), performance pass, bug fixing.
+**Phase 13: Deploy** (Section 23) and test with real office PCs.
+
+After each phase the AI reports: completed work, files created or changed, how to test, bugs found and fixed, known issues, remaining tasks.
+
+---
+
+## 23. DEPLOYMENT AND OFFICE PLAY
+
+**Option 1: AI Studio Build deploy (Cloud Run).** Follow the on-screen Deploy steps (a Google account and Cloud project may be required; buttons may change). For real-time play set (in the Cloud Run service if AI Studio doesn't): WebSockets allowed, a long request timeout (3600 s), **maximum instances = 1** (rooms live in memory), **minimum instances = 1** (no sleeping), and a region close to the office (India: `asia-south1` Mumbai). The server must listen on `process.env.PORT` and serve the site and `/ws`.
+**Option 2: An office PC as the server (no internet needed, best ping).** Install Node.js, run `npm install`, `npm run build`, `npm start`. Find the PC's IP (e.g. `192.168.1.25`); everyone opens `http://192.168.1.25:3000`. Allow the port in the firewall. Put this in the README.
+**Option 3:** Render, Railway or Fly.io for the Node server (check WebSocket support; free tiers may sleep).
+**Post-deploy smoke test:** two real PCs: create a room, join with the code and invite link, play a full match in each mode on each map type, check ping, reconnect (toggle Wi-Fi), results and rematch.
+
+---
+
+## 24. DEBUG PROMPTS
+
+- **Generic:** "Bug: [describe]. Steps: [steps]. Expected: [x]. Actual: [y]. Find the root cause, fix it, check that nothing else breaks, and re-run the related tests."
+- **Netcode:** "Other tanks jitter or teleport. Check snapshot interpolation (100 ms), timestamps and prediction reconciliation; reproduce with ?lag=150; fix and explain."
+- **Desync:** "Local tank and server disagree (rubber-banding). Make `stepTank` in /shared deterministic and identical on both sides with fixed dt; return lastProcessedSeq; fix."
+- **Hit detection:** "Shells pass through small tanks or hit without touching. Review swept segment-vs-box collision, spawn offset and lag-compensation rewind; fix."
+- **Performance:** "FPS below 60. Profile; use instancing, merged static geometry, pooled particles, capped pixel ratio, smaller shadow maps, and the auto-quality fallback."
+- **Visual:** "Tanks look too big/small or the map feels empty. Check config.ts sizes and speeds, camera height, props density, then adjust and report the values."
+- **Full audit:** "Audit everything against Section 25, list every failure, fix them all, and update QA_REPORT.md."
+
+---
+
+## 25. QA CHECKLIST
+
+**Gameplay**
+- [ ] Tank size 1.6 x 2.6 m; collision matches the visible model; speeds and turning feel right; turbo and handbrake work
+- [ ] Ice slides, mud slows, speed pads boost; tanks slide along walls without sticking
+- [ ] Cannon: damage 30, reload 1.1 s, range 120 m, one ricochet, no tunneling
+- [ ] Each of the 7 missiles works exactly as in Section 7, with warnings and counterplay
+- [ ] All 6 timed power-ups work, stack and expire correctly; stored slot rules work; box respawn 20 s; two tanks at one box = one winner
+- [ ] Destruction sequence plays fully (fireball, turret launch, debris, smoke, decal, kill feed); reduced version on Low
+- [ ] Crates break, barrels explode and chain, mines hide after 2 s, airstrike warning shows, EMP slows
+- [ ] All 5 modes end correctly (limits, sudden death, rounds, safe zone, flag rules, hill scoring)
+- [ ] All 6 maps load with the right layout and size options (Small/Medium/Large); spawns are fair; no stuck spots
+- [ ] Aim pin, lead indicator, aim assist, enemy markers, off-screen arrows all work and can be toggled
+
+**Online**
+- [ ] 2, 4, 8 and 12 tanks in one room; join/leave in lobby and during a match
+- [ ] Codes, invite link, wrong code, full room, wrong password: clear messages
+- [ ] Host migration, kick, reconnect within 60 s work
+- [ ] 150 ms latency and 3% loss: still playable, no major rubber-banding
+- [ ] A modified client cannot teleport or fire faster
+- [ ] Rate limit works; bad messages do not crash the server; room cleanup; no memory growth after 20 matches
+
+**UI and UX**
+- [ ] Lobby map dropdown shows the preview card for every map, with keyboard and mouse; non-hosts see it read-only
+- [ ] Mode cards and recommended maps work; map size option shows in the preview
+- [ ] Every screen in Section 16 works with no dead ends; HUD values correct; settings save and apply
+- [ ] Layout works from 1366x768 to 2560x1440 and fullscreen; focus visible; reduced motion works
+
+**Technical**
+- [ ] Near 60 FPS on Medium with 12 tanks on a normal office PC; Low runs on weak PCs
+- [ ] No console errors or warnings; no leaks after 20 matches
+- [ ] Chrome, Edge, Firefox; audio works and can be muted; nothing plays after leaving a match
+- [ ] Production build works; the deployed URL works from another PC
+
+---
+
+## 26. DOCUMENTS THE AI MUST CREATE
+
+`README.md` (run, build, deploy, office LAN play, structure), `HOW_TO_PLAY.md` (also an in-game page), `NETWORKING.md` (architecture, protocol, prediction, how to add a message), `MAPS.md` (how maps are defined as data and how to add a map), `QA_REPORT.md`, `PROGRESS.md`, `CHANGELOG.md`, `credits.json` and a Credits page.
+
+---
+
+## 27. FINAL DELIVERABLES AND SELF-CHECK
+
+1. A working, deployed Tank Duel Online game (URL) and the project source, implementing the Addendum (Sections 28 to 33).
+2. Authoritative server, 3D client, shared simulation, offline Practice mode.
+3. 5 modes, 6 maps with 3 sizes, 7 missiles, 6 timed power-ups, Power Boxes, bots, full HUD, aim pin, destruction animation, all screens.
+4. All documents in Section 26 and an honest list of known limitations.
+
+**Final self-check (answer YES/NO and fix every NO):** the 3 tank classes and the garage work; every animation in Section 29 plays; every HUD element in Section 30 is present; every edge case in Section 31 is handled; tanks are small and maps are large; two real PCs can play together online; every mode, map, missile and power-up works; the destruction animation plays; the lobby map preview works; the aim pin and lead indicator work; the HUD and screens match this document; performance meets the target; the QA checklist passes; the deployed URL works.
+
+**Final instruction:** Start with Phase 1 now. After each phase, stop and report. Do not continue until the phase passes its tests.
+
+
+---
+---
+
+# ADDENDUM: EXACT DETAILS TO PREVENT BUGS (Sections 28 to 33)
+**These sections are part of the specification and have priority if anything above is less exact.** Paste them together with Sections 2 to 5 in the first phase.
+
+---
+
+## 28. TANK CLASSES AND TANK SELECTION (the "Garage")
+
+Players choose a **tank class** in the lobby. The host chooses the rule: **Classic** (everyone uses the Standard class, fair and simple, default) or **Classes** (each player picks). In Classic mode the host's HP option (100 or 150) applies; in Classes mode each class has its own HP and the HP option is hidden.
+
+| Stat | Scout (fast, fragile) | **Standard** (balanced, Section 5) | Heavy (slow, tough) |
+|---|---|---|---|
+| Hull size (w x l x h) | 1.4 x 2.3 x 0.7 m | 1.6 x 2.6 x 0.8 m | 1.9 x 3.0 x 0.9 m |
+| Health | 80 | 100 | 150 |
+| Forward speed | 8.5 m/s | 7 m/s | 5.5 m/s |
+| Reverse speed | 5 m/s | 4 m/s | 3 m/s |
+| Hull turn speed (standing / full speed) | 130 / 85 deg/s | 110 / 70 deg/s | 85 / 55 deg/s |
+| Turret turn speed | 300 deg/s | 260 deg/s | 200 deg/s |
+| Cannon damage | 24 | 30 | 38 |
+| Cannon reload | 0.9 s | 1.1 s | 1.5 s |
+| Shell speed | 58 m/s | 55 m/s | 50 m/s |
+| Turbo | x1.6 for 3 s, recharge 5 s | x1.5 for 3 s, recharge 6 s | x1.35 for 2.5 s, recharge 7 s |
+| Special | **Dash:** a quick sideways dodge (Q / E keys, 6 m in 0.25 s, cooldown 4 s) | none | **Armor plating:** takes 15% less damage from the front arc (within 60 degrees of the hull front) |
+
+All three classes have their own 3D model proportions (Scout: low and wedge-shaped with a small turret; Heavy: wide with a big turret and double barrel look, still one shell per shot), the same animation set (Section 29), and an icon (small wedge, tank, big block) shown on the scoreboard and above the tank tag.
+
+**Garage panel (in the Lobby, left side, 560 x 720 px at 1920x1080):**
+1. A live 3D turntable of your tank (drag with the mouse to rotate, scroll to zoom a little) on a round pedestal with a light.
+2. **Class cards** (3, selectable): name, icon, and 5 stat bars (Speed, Armor, Firepower, Reload, Agility) filled from the table above, plus the special ability line. Selected card has a mint glow.
+3. **Color** (12 swatches): Red, Blue, Green, Yellow, Orange, Purple, Pink, Teal, White, Black, Gold, Camo. In team modes the **team color overrides the hull color** (accent stripes keep the personal color).
+4. **Turret style** (3 thumbnails) and **Decal** (6 thumbnails, e.g. stripes, star, skull, flame, checker, dots).
+5. **Name tag preview** and the nickname field.
+6. Changes apply instantly to the preview. If a player changes anything after clicking Ready, Ready is cleared automatically. Choices are saved in localStorage and restored next time. Two players cannot pick the same color in FFA (a used color is dimmed with a lock icon); in team modes the team color is used and the problem does not exist.
+
+---
+
+## 29. ANIMATION SPECIFICATION SHEET (exact timing)
+
+All timing in seconds. All easing from the UI tokens (`--ease-out`, `--ease-bounce`) unless noted. "Pooled" = taken from an object pool, never created during play. Every animation has a **reduced-motion / Low quality** variant (fewer particles, no slow motion, no camera shake).
+
+### 29.1 Tank animations
+| Animation | Trigger | Spec |
+|---|---|---|
+| Idle vibration | stationary | 0.02 m jitter at 14 Hz, antenna sway +-6 degrees at 1.2 Hz |
+| Track scroll | moving | scroll rate = speed / track circumference, reverse when reversing |
+| Hull pitch and roll | accel/brake/turn | pitch max 3 degrees, roll max 4 degrees, spring-damped (stiffness 12, damping 0.8) |
+| Dust / snow / mud trail | moving | 1 puff per 0.08 s per track, life 0.8 s, color by ground type |
+| Fire recoil | cannon fired | barrel back 0.2 m in 0.1 s, return 0.25 s; hull kick back 0.1 m; muzzle flash sprite 0.06 s + point light 0.08 s; smoke puff 0.5 s |
+| Turret rotation | mouse aim | smooth at the class turret speed; servo sound only while rotating |
+| Hit reaction | damage taken | white flash 0.08 s, 6 sparks, shake 0.05 m for 0.12 s, floating damage number rising 1.2 m over 0.8 s |
+| Low health smoke | HP below 30 | gray smoke from the engine, black plus small flame below 15 HP |
+| Shield bubble | shield active | translucent blue sphere, hex pattern, fresnel edge, pulse 1.5 Hz; ripple ring at hit point 0.3 s; pops with a blue burst when broken |
+| Spawn | respawn | light beam column 0.6 s, tank scales 0.6 to 1 with a ring on the ground, then blinks (0.2 s on/off) for the 2 s protection |
+| Turbo | turbo active | blue flame at the rear, speed lines on screen edge (very light), FOV +4 for 0.3 s |
+| Handbrake pivot | Ctrl held | tracks counter-rotate, dust ring, skid decal |
+| Scout dash | Q / E | stretch (scale x1.1 along motion), after-image 3 ghosts fading in 0.25 s |
+| Win pose | results | turret spins 360 over 1.2 s, fires a celebration shell upward, confetti |
+| **Destruction** | HP 0 | the full sequence in Section 12 (this table does not replace it) |
+
+### 29.2 Missile and weapon visuals
+| Weapon | Model and look | Flight | Impact |
+|---|---|---|---|
+| Cannon shell | 0.35 m glowing yellow-white capsule | tracer trail 0.15 s | spark burst, dust; ricochet = spark + "ping" |
+| Homing Missile | 0.9 m long, 0.12 m wide red body, white nose, 4 white fins; orange engine flame (emissive cone, flickers 20 Hz) | gray smoke trail lasting 1.2 s, slight wobble; **red lock-on ring** (0.8 m, rotating) on the target; target gets a beep (faster as it nears) | fireball r2 m (0.35 s), small shockwave, debris dust |
+| Cluster Missile | 1.2 m long yellow body with black bands, 2 fins | arcs up to 12 m high toward the pin, white vapor trail; opens in the air with a white flash (0.1 s) releasing **5 bomblets** (0.25 m dark spheres, blinking red) that fall in 0.6 s over a 6 m circle (warning ring on the ground appears at launch) | each: fireball r1.5 m (0.25 s) |
+| Guided Missile | 1.0 m cyan body, antenna, glowing eye | camera switches to a chase view behind the missile (FOV 75, light vignette, "GUIDED" HUD with a 4 s fuel bar and a crosshair), the owner's tank is greyed out in the world | fireball r3 m (0.45 s), strong camera shake |
+| Bouncing Shell | 0.5 m glowing orange ball, ember trail | leaves 3 small embers per 0.1 s | each bounce: orange spark ring; bounce counter shown above the shell; last impact fireball r1.5 m |
+| EMP Pulse | the tank charges for 0.3 s (blue sparks) | expanding translucent blue sphere from the tank to r15 m in 0.5 s with a ring on the ground | affected tanks: electric arcs on the hull for 3 s, their HUD icons flicker, "EMP" tag above them |
+| Mines | 0.6 m gray disc with a blinking light (green for owner and team; invisible to enemies after 2 s) | dropped with a small hop (0.3 m) | fireball r3 m (0.4 s), ground crater decal 15 s |
+| Airstrike | marker: large red pulsing circle r6 m on the ground, with a countdown ring (1.5 s) and a warning icon visible to everyone | 3 shells fall from the sky one after another (0.4 s apart, 5 m spacing) with a descending whistle | each: fireball r4 m (0.5 s), shockwave, camera shake, crater decal 20 s |
+
+### 29.3 Power Box animations
+| Moment | Spec |
+|---|---|
+| Idle | cube 1.2 m, neon outline, "?" symbol; rotates 45 degrees/s, bobs 0.2 m at 0.8 Hz; ground ring pulses 1.5 Hz; light beam 14 m high (color by rarity: green = common, blue = timed, gold = stored weapon, purple = rare) |
+| Respawn | ring on the ground expands 0.5 s, cube pops in (scale 0 to 1.2 to 1 over 0.4 s), small chime heard within 40 m |
+| Respawn timer | while empty: a thin ring on the pad fills over 20 s; the minimap icon is dimmed with the remaining seconds |
+| Pickup | cube bursts into 20 sparkles (0.5 s), beam collapses, the tank gets a colored flash aura 0.4 s; HUD pops the item icon + name (scale 1.3 to 1, stays 2 s) and the buff ring or weapon slot fills |
+| Swap warning | picking a stored weapon while holding one shows a swap arrow on the slot icon |
+
+### 29.4 Mode and world animations
+Flag: cloth waving (vertex wave, 1.5 Hz), glow beam at the base; carried flag floats above the carrier; capture = confetti burst and horn. Hill zone: glowing cylinder wall (height 3 m, pulsing 1 Hz), color shows who holds it (white = empty, team color = held, red flicker = contested); moving to the next zone: the old one shrinks 0.6 s while the new one grows 0.6 s. Safe zone ring: translucent wall that shrinks smoothly; the outside is tinted red with a faint pulse. Speed pad: arrows flowing along the pad at 2 Hz. Barrel before exploding: red glow flicker 0.3 s. Crate break: 8 plank pieces, 0.8 s fade. Tread marks fade over 10 s.
+
+### 29.5 UI animations
+| Element | Spec |
+|---|---|
+| Screen change | old screen fades + slides 24 px (280 ms), new one in |
+| Lobby map preview card | cross-fade + slide 16 px, 200 ms; thumbnail zoom 1.04 to 1 over 400 ms |
+| Mode / map / class cards | hover: lift -4 px + glow 120 ms; select: bounce (scale 0.97 to 1.03 to 1), 240 ms |
+| Player joins lobby | row slides in from the right 300 ms with a bounce; leaving: fade 200 ms |
+| Ready | check mark draws in 240 ms, row flashes mint |
+| Countdown 3-2-1-FIGHT | each number pops (scale 0.5 to 1.2 to 1) in 800 ms, FIGHT in gold with a soft flash |
+| Health bar | smooth drain 300 ms, a white "lag" bar follows 500 ms later; shakes on big damage |
+| Kill feed | new entry slides in from the left 200 ms, fades out after 6 s |
+| Streak banner | scales in from 0 to 1.1 to 1 (350 ms), stays 1.5 s, slides up and fades |
+| Results podium | blocks rise 1.2 s staggered (3rd, 2nd, 1st), winner confetti (150 pooled particles) |
+| Score numbers | count up 400 ms with a pulse |
+
+---
+
+## 30. EXACT UI ELEMENT SPECIFICATION (reference stage 1920 x 1080, scale to fit)
+
+The UI is laid out on a 1920x1080 stage and scaled to the window (minimum supported window 1280x720). 5% safe margin.
+
+### 30.1 HUD element sizes and positions
+| Element | Size | Position |
+|---|---|---|
+| Health bar | 520 x 28 px, rounded | bottom center, 48 px from the bottom |
+| Turbo bar | 320 x 10 px | directly under the health bar, 8 px gap |
+| Weapon slot | 96 x 96 px glass square with icon, name below (20 px), key hint badge | bottom center, 24 px left of the health bar |
+| Buff icons | 48 x 48 px with ring | in a row above the health bar, left-aligned to it |
+| Kills / deaths | glass pill 220 x 56 px | bottom left, 40 px margins |
+| Minimap | 280 x 280 px (enlarged: 640 x 640 px centered for 3 s) | top right, 32 px margins, round-cornered |
+| Objective bar | 480 x 64 px glass | top center: timer 40 px bold, mode objective or score below it |
+| Kill feed | rows 44 px high, max 5 | top left, 32 px margins |
+| Aim pin / reload ring | pin 36 px, ring 64 px | at the mouse position (drawn in 3D on the ground) |
+| Ping / FPS | text 16 px | bottom right, 16 px margins (can be hidden in Settings) |
+| Center messages | text 64 px Fredoka | 25% from the top |
+| Inbound warning | red arrow 64 px at the screen edge toward the threat + "MISSILE!" text 32 px | screen edge |
+
+Minimum text sizes: 16 px (small labels), 20 px (HUD labels), 24 px+ (numbers). Never place HUD over the center third of the bottom edge except the health bar and weapon slot.
+
+### 30.2 Lobby layout (3 columns)
+- **Left (560 px): Garage panel** (Section 28).
+- **Center (640 px): Players list** (10 rows x 64 px: color dot, class icon, nickname, host crown, ready check, ping, kick button for the host) and the **chat box** (bottom, 200 px high, with 6 quick-message buttons).
+- **Right (560 px): Host controls** (read-only for others): **Mode cards** (5 small cards in a row), **Map dropdown** (56 px high) with the **MAP PREVIEW CARD** (520 x 360 px: thumbnail 520 x 292, below it the name 28 px, the one-line description 20 px, recommended players, "best for" tag, hazard icons, selected size) directly under it, **Map size** segmented control (Small / Medium / Large), time limit, score limit, Power Boxes toggle, bots count + difficulty, friendly fire, tank rule (Classic / Classes), tank HP, shrinking zone, password.
+- **Top bar:** room code (large 56 px, copy button), **Copy invite link**, Leave.
+- **Bottom bar:** **READY** (everyone) and **START** (host only, disabled with a tooltip explaining why: "Need at least 2 ready players or 1 player with bots").
+- Below 1500 px window width the three columns become tabs (Garage / Players / Match settings) so nothing is cut off.
+
+### 30.3 Other screens (required elements)
+- **Main Menu:** logo 120 px, buttons 72 px high (Create Room, Join Room, Practice, How to Play, Settings, Credits), nickname field, rotating tank preview, version number, small "Server status: online / offline" dot.
+- **Join Room:** code input (4 boxes, 80 px each), password field (shown only if the room needs one), Join and Back buttons, error text area (red, 20 px).
+- **Results:** winner banner (96 px), podium (top 3, 3D), stats table (columns: rank, name, class icon, kills, deaths, assists, damage, accuracy, power-ups, best streak), awards row (up to 6 badges with names), buttons Rematch / Back to Lobby / Leave, a "Rematch votes: 3/6" indicator.
+- **Scoreboard (hold Tab):** 800 px wide glass table, sorted by kills then fewer deaths, your row highlighted, team totals on top in team modes, ping column.
+- **Death overlay:** center panel "Destroyed by [name]" with the killer's tank icon and class, respawn countdown 72 px, "Spectate" option in Last Tank Standing.
+- **Settings:** left tab list (Graphics, Audio, Controls, Aiming, Gameplay, Accessibility), right panel with 80 px rows (label left, control right), buttons Apply (instant) and Reset to defaults (with confirmation).
+
+All buttons: minimum 64 px high on menus, hover lift, visible focus ring, pressed squash, disabled 40%, sounds on hover and click.
+
+---
+
+## 31. RULES AND EDGE CASES (bug prevention: implement every line)
+
+| # | Situation | Required behavior |
+|---|---|---|
+| 1 | Two tanks destroy each other on the same server tick | Both die; both get a kill credited; in Last Tank Standing, if that leaves no survivor the round is a **draw and is replayed** (max 2 replays, then both get the round) |
+| 2 | Killer disconnects before the kill is shown | Kill stays credited to the killer's name; kill feed still shows it |
+| 3 | A shell hits a tank during its spawn shield | The shell is destroyed, no damage, small shield ripple |
+| 4 | Shell hits a missile | Missiles have 10 HP and can be destroyed (cannon does 30), explosion at that spot; cluster and guided missiles have 10 HP as well |
+| 5 | Two tanks overlap (spawn, pushing) | Push them apart along the center line, 4 m/s separation; never allow permanent overlap; spawn points are chosen so no tank is within 8 m |
+| 6 | Tank touches a Power Box on the same tick as another tank | The tank with the lower server-side distance wins; if equal, the earlier input sequence time wins; only one pickup per box |
+| 7 | A dead tank touches a Power Box | No pickup |
+| 8 | Tank dies holding a stored weapon or buffs | Stored weapon is lost; all timed buffs cleared; no drops |
+| 9 | Flag carrier dies, disconnects or leaves | The flag drops at that position; it returns to base after 15 s or when touched by its own team |
+| 10 | Your flag is stolen and you carry the enemy flag to your base | No score; the "Your flag is taken!" message shows; you must recover your flag first |
+| 11 | Time runs out while a flag is carried | The carrier's team gets no point for it |
+| 12 | King of the Hill: dead tanks, tanks inside an EMP | Dead tanks do not count; EMP tanks count normally; contested (two teams or two FFA players) = no points |
+| 13 | Safe zone | Final radius 20 m; outside the ring damage is 5 HP per second (not blocked by shield); the ring shrinks linearly from 30 s to 70% of the match time |
+| 14 | Mine on a teammate (team modes) | No damage to teammates; in FFA mines hurt everyone including the owner |
+| 15 | Airstrike or barrel on the owner | Hurts the owner in FFA, not in team modes; barrel explosions always hurt everyone |
+| 16 | Guided missile owner dies or disconnects | The missile detonates at once; the camera returns |
+| 17 | Player joins a match in progress | FFA / TDM / CTF / KOTH: joins immediately as a new tank with 0 score and a 3 s spawn (late-join allowed until the last 60 s); Last Tank Standing: spectator until the next round; always allowed up to the room limit |
+| 18 | Fewer than 2 tanks left in a running match with no bots (everyone left) | The match ends immediately and shows results; the room goes back to the lobby |
+| 19 | Host leaves | Host migrates to the earliest-joined remaining human, everyone gets a toast "[name] is now the host"; the running match continues; the lobby settings stay |
+| 20 | Player disconnects | Tank is parked, invulnerable and shown as "Reconnecting..." for 60 s, then removed; the score is kept for the results screen as "left" |
+| 21 | Duplicate nickname | Add a suffix: "Sam", "Sam (2)", "Sam (3)" |
+| 22 | Nickname invalid (empty, only spaces, HTML) | Replace with "Player" + random 3 digits |
+| 23 | Browser tab hidden or minimized | The client sends neutral inputs; after 10 s the player is marked AFK (tank stops, tag shows "AFK"); after 60 s they are removed from the match; they can rejoin |
+| 24 | Window resize, fullscreen toggle | The renderer and UI scale instantly; no game state is lost; the aim pin stays correct |
+| 25 | Mouse leaves the window | The last aim point is kept; clicks outside are ignored; no stuck fire (fire is cleared when the window loses focus) |
+| 26 | Keys stuck after Alt-Tab | Clear all pressed keys and mouse buttons on blur and on visibility change |
+| 27 | Clock differences between PCs | The server sends its time; the client keeps an offset and uses server time for all timers shown (match timer, respawn, box timers) |
+| 28 | Lag spike | Interpolation extrapolates at most 200 ms; after that the tank is shown frozen with a small "lag" icon; on recovery positions blend within 150 ms |
+| 29 | Rematch | Scores, kills and states reset; players keep class, color, and settings; players who left are removed; a player who joined sees the lobby; the host can change settings first |
+| 30 | Kick | Kicked player sees "You were removed by the host" and returns to the menu; cannot rejoin the same room for 60 s |
+| 31 | Full room | New players see "Room is full" with a "Join as spectator" button (spectators do not count toward the limit, max 6) |
+| 32 | Wrong room state | Joining during COUNTDOWN is allowed (they get a tank at the next spawn); joining during RESULTS places them in the lobby |
+| 33 | Ties at time up | Sudden death as in Section 9; if no kill/score happens in 60 s the match is a draw and all tied players share first place |
+| 34 | Scoreboard order | Kills (high first), then deaths (low first), then damage dealt (high first), then name |
+| 35 | Respawn on the same spot repeatedly | The server never uses the same spawn point twice in a row for one player and prefers the point farthest from enemies |
+| 36 | Bullets leaving the map | All projectiles are removed at the perimeter wall (ricochet once for shells, other weapons explode); no projectile exists longer than its lifetime |
+| 37 | Floating point drift | Positions are rounded to 3 decimals in the shared step function; use fixed dt (1/30 s); never use Date.now() inside the simulation step |
+| 38 | Missing assets or models | Always fall back to the code-drawn version; the game must never show a blank screen |
+| 39 | Server error | The server logs the error and continues; one room crashing must never crash the others (each room runs in a try/catch loop) |
+| 40 | Reconnect to an ended room | Show "That room no longer exists" and return to the menu |
+
+---
+
+## 32. SERVER TICK ORDER AND VALIDATION LIMITS
+
+**Order of operations for each server tick (30 Hz).** Keep exactly this order so results are deterministic:
+1. Read the newest unprocessed input of each player (use the last input if none arrived; if none for 0.3 s use neutral input).
+2. Validate and clamp inputs (see limits below).
+3. Update timed effects and cooldowns (buffs, reload, turbo, dash, EMP, spawn shield).
+4. Move tanks (`stepTank`), resolve tank-vs-world and tank-vs-tank collisions.
+5. Handle fire / weapon use requests (reload and ammo checks), create projectiles.
+6. Move projectiles with swept collision; apply hits, ricochets and explosions; apply damage in a consistent order (by projectile creation time).
+7. Process pickups (Power Boxes, flags).
+8. Process deaths (destruction events, kills, assists, streaks), start respawn timers.
+9. Process mode logic (scores, flags, hill zone, safe zone, round and match end).
+10. Process respawns and box respawns.
+11. Every 3rd tick (about 10 Hz) or per the 20 Hz schedule: build and send snapshots; send queued events immediately.
+
+**Validation limits (server enforces):**
+| Item | Limit |
+|---|---|
+| Move input | forward and turn in [-1, 1] |
+| Aim | aim point inside the map bounds; turret turn speed limited to the class value |
+| Fire | not faster than the class reload (and 0.9 s minimum for Rapid Fire logic) |
+| Weapon use | only if the slot is filled and the weapon is ready |
+| Nickname | 1 to 14 characters after trim, no `<` `>` characters |
+| Chat message | max 80 characters, max 1 per second, quick-chat only for the first 5 s of a match |
+| Room code | 4 characters from the allowed set |
+| Messages | max 120 per second per socket; at 200 per second, close the socket |
+| Max packet size | 4 KB for client messages |
+| Player counts | 2 to 10 humans, 12 tanks total, 6 spectators |
+| Speeds | positions that exceed class speed x 1.2 per tick are corrected back by the server |
+
+**Config rule:** every number in Sections 5, 7, 8, 9, 28 and 31 lives in `/shared/config.ts`. A debug command `?debug=1` shows an overlay with: ping, tick rate, snapshot rate, prediction error, entities count, FPS, and lets you change speeds live in Practice mode.
+
+---
+
+## 33. REQUIREMENT TRACEABILITY (everything you asked for and where it is)
+
+| You asked for | Where it is in this document |
+|---|---|
+| 3D tank game for the office, online, rooms, play on PCs | Sections 2, 3, 20, 23 |
+| Tank select (choose tank) | Section 28 (3 classes, color, turret, decal, garage) |
+| Small tanks, big maps | Sections 5, 10, 28 |
+| Different maps with exact data | Section 10 (6 maps, coordinates, sizes) |
+| Different modes with different plans and recommended maps | Section 9 |
+| Power Boxes and all power-ups | Sections 8, 29.3 |
+| Interesting missiles | Sections 7, 29.2 |
+| Tank movement feel | Sections 5, 29.1 |
+| Tank destroy animation | Section 12 and 29.1 |
+| Mouse aim, pin, easy hitting | Sections 4, 14 |
+| Lobby map preview when selecting a map | Sections 16, 30.2 |
+| Modern UI, HUD, screens | Sections 15, 16, 17, 30 |
+| All animations with timing | Sections 12, 29 |
+| Audio | Section 18 |
+| Bots | Section 19 |
+| Rules and edge cases (so there are no bugs) | Sections 6, 31, 32 |
+| Build steps, testing, deployment | Sections 22, 23, 24, 25 |
+| Banner and image prompts | Section 21 |
+
+**Extra QA for this addendum (add to Section 25):**
+- [ ] Every class (Scout, Standard, Heavy) behaves exactly as in the table; Scout dash and Heavy armor work; the garage saves choices and clears Ready on change
+- [ ] Every animation in Section 29 exists with the stated timing and has a Low/reduced-motion version
+- [ ] Every HUD element in 30.1 is present at the stated size and position; the lobby works at widths below 1500 px (tabs)
+- [ ] Every row of the table in Section 31 is tested with at least one scripted or manual test
+- [ ] The tick order in Section 32 is followed; server validation rejects out-of-range input
+- [ ] The debug overlay (`?debug=1`) works

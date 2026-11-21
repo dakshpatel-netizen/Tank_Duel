@@ -1,0 +1,6 @@
+{
+  "name": "Tank Duel Online",
+  "description": "3D multiplayer tank battle arena for the office with 5 game modes, 6 maps, 3 tank classes, 7 missile weapons, and authoritative WebSocket netcode.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

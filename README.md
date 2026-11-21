@@ -1,11 +1,35 @@
-<div align="center">
+# Tank Duel Online
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+A 3D browser multiplayer tank battle game powered by Three.js, React, and an authoritative Node.js WebSocket server (`ws`).
 
-  <h1>Built with AI Studio</h2>
+## Quick Start
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+```bash
+npm install
+npm run dev
+```
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+Open `http://localhost:3000` in your browser.
+- Use `?autostart=1` to jump directly into an offline Practice match against bots.
+- Use `?room=CODE` to prefill the Join Room code from an invite link.
+- Use `?debug=1` to display FPS, ping, prediction error, and entity count in battle.
 
-</div>
+## Production Build & Start
+
+```bash
+npm run build
+npm run start
+```
+
+## Features
+- **3 Tank Classes**: Scout (fast + Q/E sideways dash), Standard (balanced), Heavy (150 HP + 15% frontal armor).
+- **6 Stylized Maps**: Desert Outpost, Industrial Yard, Frozen Lake, Forest Maze, Twin Bases, Crater Hill — each scalable to Small (0.75x), Medium (1.0x), and Large (1.4x).
+- **5 Game Modes**: Free For All, Team Deathmatch, Last Tank Standing (Best of 5 + Shrinking Safe Zone), Capture the Flag, King of the Hill.
+- **13 Power Box Items**: 6 timed buffs and 7 special stored weapons (Homing, Cluster, Guided, Bouncing, EMP, Mines, Airstrike).
+- **Authoritative Server**: 30 Hz simulation tick, 20 Hz state snapshots, client-side prediction & reconciliation, remote interpolation, bot backfill, and 60s reconnect grace.
+
+## Tests
+
+```bash
+npm run test
+```
